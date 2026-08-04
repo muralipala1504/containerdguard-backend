@@ -1,7 +1,7 @@
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
-const stripe = require('stripe')('sk_test_51U0Q2AE5389UQlbCyBj2b2ikN63RJ4S0bynTnbMUgvnJToWJ0MgxBMmBIaphtOOD4d1yYE4rU8mnPDtsROZXzVFC00bxFo7TxL')
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_KEY_HERE')
 
 const app = express()
 const PORT = 3001
