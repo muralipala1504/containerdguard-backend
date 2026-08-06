@@ -101,9 +101,10 @@ app.post('/api/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: 'http://192.168.217.163:5173/dashboard?success=true',
-      cancel_url: 'http://192.168.217.163:5173/pricing?canceled=true'
-    })
+      success_url: 'https://containerguard-dashboard.vercel.app/dashboard?success=true',
+      cancel_url: 'https://containerguard-dashboard.vercel.app/pricing?canceled=true'
+
+})
 
     res.json({ sessionId: session.id })
   } catch (error) {
