@@ -101,9 +101,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
       mode: 'subscription',
-success_url: 'https://muralipala-containerdguard-dashboard.static.hf.space/dashboard?success=true',
-cancel_url: 'https://muralipala-containerdguard-dashboard.static.hf.space/pricing?canceled=true'
-})
+success_url: 'https://hubspace.aillowpages.com/pricing?success=true',
+cancel_url: 'https://hubspace.aillowpages.com/pricing?canceled=true'})
 
     res.json({ sessionId: session.id })
   } catch (error) {
