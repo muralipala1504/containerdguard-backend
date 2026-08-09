@@ -113,3 +113,55 @@ cancel_url: 'https://hubspace.aillowpages.com/pricing?canceled=true'})
 app.listen(PORT, () => {
   console.log(`🚀 ContainerGuard Backend running on port ${PORT}`)
 })
+
+// Import monitoring services
+const K8sMonitor = require('./k8s-service.js');
+const DockerMonitor = require('./docker-service.js');
+
+const k8sMonitor = new K8sMonitor();
+const dockerMonitor = new DockerMonitor();
+
+// Unified monitoring endpoint: K8s + Docker
+app.get('/api/monitoring/all', async (req, res) => {
+  try {
+    const k8sClusters = await k8sMonitor.getClusterInfo();
+    const k8sPods = await k8sMonitor.getAllPods();
+    const dockerContainers = await dockerMonitor.getRunningContainers();
+    const dockerInfo = await dockerMonitor.getDockerInfo();
+
+    res.json({
+      k8s: {
+        clusterInfo: k8sClusters,
+        pods: k8sPods
+      },
+      docker: {
+        info: dockerInfo,
+        containers: dockerContainers
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// K8s only endpoint
+app.get('/api/monitoring/k8s', async (req, res) => {
+  try {
+    const clusterInfo = await k8sMonitor.getClusterInfo();
+    const pods = await k8sMonitor.getAllPods();
+    res.json({ clusterInfo, pods });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Docker only endpoint
+app.get('/api/monitoring/docker', async (req, res) => {
+  try {
+    const info = await dockerMonitor.getDockerInfo();
+    const containers = await dockerMonitor.getRunningContainers();
+    res.json({ info, containers });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
