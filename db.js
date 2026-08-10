@@ -1,45 +1,41 @@
-const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'data.db');
+const dbPath = path.join(__dirname, 'users.json');
 
-let db = null;
+function ensureDbFile() {
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify([]));
+  }
+}
 
 function getDB() {
-  if (!db) {
-    db = new sqlite3.Database(dbPath, (err) => {
-      if (err) {
-        console.error('Database error:', err.message);
-      } else {
-        console.log('Connected to SQLite database');
-        // Initialize schema
-        db.serialize(() => {
-          db.run(`
-            CREATE TABLE IF NOT EXISTS users (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              email TEXT UNIQUE NOT NULL,
-              password TEXT NOT NULL,
-              name TEXT NOT NULL,
-              verified BOOLEAN DEFAULT 0,
-              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-          `);
-        });
+  ensureDbFile();
+  const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  return {
+    run: (sql, params) => {
+      if (sql.includes('INSERT INTO users')) {
+        const user = { id: Date.now(), ...params };
+        data.push(user);
+        saveDB(data);
       }
-    });
-  }
-  return db;
+    },
+    prepare: (sql) => ({
+      bind: (params) => {
+        if (sql.includes('SELECT')) {
+          return {
+            step: () => data.some(u => u.email === params[0]),
+            getAsObject: () => data.find(u => u.email === params[0]),
+            free: () => {}
+          };
+        }
+      }
+    })
+  };
 }
 
-function saveDB() {
-  // sqlite3 auto-saves
+function saveDB(data) {
+  fs.writeFileSync(dbPath, JSON.stringify(data || JSON.parse(fs.readFileSync(dbPath)), null, 2));
 }
 
-function closeDB() {
-  if (db) {
-    db.close();
-    db = null;
-  }
-}
-
-module.exports = { getDB, saveDB, closeDB };
+module.exports = { getDB, saveDB };
