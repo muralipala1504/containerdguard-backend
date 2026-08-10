@@ -1,6 +1,5 @@
-const sqlite3 = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const fs = require('fs');
 
 const dbPath = path.join(__dirname, 'data.db');
 
@@ -8,28 +7,32 @@ let db = null;
 
 function getDB() {
   if (!db) {
-    db = new sqlite3(dbPath);
-    db.pragma('journal_mode = WAL');
-    
-    // Initialize schema if needed
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        verified BOOLEAN DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    db = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('Database error:', err.message);
+      } else {
+        console.log('Connected to SQLite database');
+        // Initialize schema
+        db.serialize(() => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              email TEXT UNIQUE NOT NULL,
+              password TEXT NOT NULL,
+              name TEXT NOT NULL,
+              verified BOOLEAN DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+        });
+      }
+    });
   }
   return db;
 }
 
 function saveDB() {
-  if (db) {
-    db.exec('VACUUM');
-  }
+  // sqlite3 auto-saves
 }
 
 function closeDB() {
