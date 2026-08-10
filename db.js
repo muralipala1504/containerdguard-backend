@@ -1,70 +1,42 @@
-const initSqlJs = require('sql.js')
-const fs = require('fs')
-const path = require('path')
+const sqlite3 = require('better-sqlite3');
+const path = require('path');
+const fs = require('fs');
 
-let db = null
+const dbPath = path.join(__dirname, 'data.db');
 
-const dbPath = path.join(__dirname, 'containerguard.db')
+let db = null;
 
-// Initialize database
-async function initDB() {
-  const SQL = await initSqlJs()
-  
-  // Load existing database or create new
-  let filebuffer = null
-  if (fs.existsSync(dbPath)) {
-    filebuffer = fs.readFileSync(dbPath)
+function getDB() {
+  if (!db) {
+    db = new sqlite3(dbPath);
+    db.pragma('journal_mode = WAL');
+    
+    // Initialize schema if needed
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        verified BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   }
-  
-  db = new SQL.Database(filebuffer)
-  
-  // Create tables
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    name TEXT NOT NULL,
-    verified INTEGER DEFAULT 0,
-    verification_token TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`)
-  db.run(`
-    CREATE TABLE IF NOT EXISTS subscriptions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      stripe_customer_id TEXT UNIQUE NOT NULL,
-      stripe_subscription_id TEXT UNIQUE,
-      plan_id TEXT NOT NULL,
-      status TEXT DEFAULT 'active',
-      trial_ends_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-  `)
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS payments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subscription_id INTEGER NOT NULL,
-      stripe_payment_id TEXT UNIQUE,
-      amount INTEGER NOT NULL,
-      status TEXT DEFAULT 'pending',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (subscription_id) REFERENCES subscriptions(id)
-    )
-  `)
-
-  saveDB()
-  console.log('✅ Database initialized')
+  return db;
 }
 
 function saveDB() {
   if (db) {
-    const data = db.export()
-    fs.writeFileSync(dbPath, Buffer.from(data))
+    db.exec('VACUUM');
   }
 }
 
-module.exports = { db: () => db, initDB, saveDB }
+function closeDB() {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
+module.exports = { getDB, saveDB, closeDB };
