@@ -35,8 +35,24 @@ app.use(express.json());
 const K8sMonitor = require('./k8s-service.js');
 const DockerMonitor = require('./docker-service.js');
 
-const k8sMonitor = new K8sMonitor();
-const dockerMonitor = new DockerMonitor();
+let k8sMonitor = null;
+let dockerMonitor = null;
+
+// Initialize K8s monitoring (optional - fails gracefully if cluster unavailable)
+try {
+  k8sMonitor = new K8sMonitor();
+  console.log('✅ K8s monitoring initialized');
+} catch (error) {
+  console.warn('⚠️ K8s monitoring unavailable:', error.message);
+}
+
+// Initialize Docker monitoring (optional - fails gracefully if daemon unavailable)
+try {
+  dockerMonitor = new DockerMonitor();
+  console.log('✅ Docker monitoring initialized');
+} catch (error) {
+  console.warn('⚠️ Docker monitoring unavailable:', error.message);
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -93,20 +109,19 @@ app.post('/api/auth/login', async (req, res) => {
 // Unified monitoring endpoint: K8s + Docker
 app.get('/api/monitoring/all', async (req, res) => {
   try {
-    const k8sClusters = await k8sMonitor.getClusterInfo();
-    const k8sPods = await k8sMonitor.getAllPods();
-    const dockerContainers = await dockerMonitor.getRunningContainers();
-    const dockerInfo = await dockerMonitor.getDockerInfo();
+    const k8sData = k8sMonitor ? {
+      clusterInfo: await k8sMonitor.getClusterInfo(),
+      pods: await k8sMonitor.getAllPods()
+    } : { clusterInfo: null, pods: [], error: 'K8s monitoring not available' };
+
+    const dockerData = dockerMonitor ? {
+      info: await dockerMonitor.getDockerInfo(),
+      containers: await dockerMonitor.getRunningContainers()
+    } : { info: null, containers: [], error: 'Docker monitoring not available' };
 
     res.json({
-      k8s: {
-        clusterInfo: k8sClusters,
-        pods: k8sPods
-      },
-      docker: {
-        info: dockerInfo,
-        containers: dockerContainers
-      }
+      k8s: k8sData,
+      docker: dockerData
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -115,6 +130,9 @@ app.get('/api/monitoring/all', async (req, res) => {
 
 // K8s only endpoint
 app.get('/api/monitoring/k8s', async (req, res) => {
+  if (!k8sMonitor) {
+    return res.status(503).json({ error: 'K8s monitoring not available' });
+  }
   try {
     const clusterInfo = await k8sMonitor.getClusterInfo();
     const pods = await k8sMonitor.getAllPods();
@@ -126,6 +144,9 @@ app.get('/api/monitoring/k8s', async (req, res) => {
 
 // Docker only endpoint
 app.get('/api/monitoring/docker', async (req, res) => {
+  if (!dockerMonitor) {
+    return res.status(503).json({ error: 'Docker monitoring not available' });
+  }
   try {
     const info = await dockerMonitor.getDockerInfo();
     const containers = await dockerMonitor.getRunningContainers();
