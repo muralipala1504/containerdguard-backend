@@ -1,41 +1,62 @@
+const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'users.json');
+const dbPath = path.join(__dirname, 'containerguard.db');
+let db = null;
+let SQL = null;
 
-function ensureDbFile() {
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify([]));
+async function initDB() {
+  try {
+    SQL = await initSqlJs();
+    
+    // Load existing database or create new
+    if (fs.existsSync(dbPath)) {
+      const buffer = fs.readFileSync(dbPath);
+      db = new SQL.Database(buffer);
+      console.log('✅ SQLite database loaded');
+    } else {
+      db = new SQL.Database();
+      console.log('✅ SQLite database created');
+    }
+
+    // Create users table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        verified INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    console.log('✅ Users table ready');
+    saveDB();
+    return db;
+  } catch (error) {
+    console.error('Database initialization error:', error.message);
+    throw error;
   }
 }
 
 function getDB() {
-  ensureDbFile();
-  const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-  return {
-    run: (sql, params) => {
-      if (sql.includes('INSERT INTO users')) {
-        const user = { id: Date.now(), ...params };
-        data.push(user);
-        saveDB(data);
-      }
-    },
-    prepare: (sql) => ({
-      bind: (params) => {
-        if (sql.includes('SELECT')) {
-          return {
-            step: () => data.some(u => u.email === params[0]),
-            getAsObject: () => data.find(u => u.email === params[0]),
-            free: () => {}
-          };
-        }
-      }
-    })
-  };
+  if (!db) throw new Error('Database not initialized. Call initDB() first.');
+  return db;
 }
 
-function saveDB(data) {
-  fs.writeFileSync(dbPath, JSON.stringify(data || JSON.parse(fs.readFileSync(dbPath)), null, 2));
+function saveDB() {
+  if (db) {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  }
 }
 
-module.exports = { getDB, saveDB };
+function closeDB() {
+  saveDB();
+  if (db) db.close();
+}
+
+module.exports = { initDB, getDB, saveDB, closeDB };
