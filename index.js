@@ -17,6 +17,7 @@ app.use(cors({
       'https://muralipala-containerdguard-dashboard.hf.space',
       'https://muralipala-containerdguard-dashboard.static.hf.space',
       'http://192.168.217.163:5173'
+      'https://overexert-elm-underpass.ngrok-free.dev'  // for local testing if needed
     ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
